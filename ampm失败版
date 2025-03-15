@@ -48,62 +48,69 @@ endmodule
 module counter24(
     output reg [7:0] Cnt,
     input nCR, EN, CP,
-    input mode, dec, // mode = 1 时进入调整模式，dec 控制加减
-    input danwei,
-    output reg am_pm
+    input mode, dec,  
+    input danwei,     // danwei = 1: 12小时制, danwei = 0: 24小时制
+    output reg am_pm  // AM = 0, PM = 1
 );
- always @(posedge CP or posedge nCR) begin
-    if (nCR)
-        Cnt <= 8'h00; // 复位到 00
-    else if (~EN)
-        Cnt <= Cnt; // 保持当前状态
+    always @(posedge CP or posedge nCR) begin
+        if (nCR) begin
+            Cnt <= 8'h00; // 复位到 00:00
+            am_pm <= 0; // AM
+        end else if (~EN)
+            Cnt <= Cnt; // 保持当前状态
         
-    else if (mode==1 && danwei==0) begin // 调整模式
-        if (dec) begin // 加 1
-            if (Cnt == 8'h23)
-                Cnt <= 8'h00;
-            else if (Cnt[3:0] == 4'd9) begin
-                Cnt[3:0] <= 4'd0;
-                Cnt[7:4] <= Cnt[7:4] + 1'b1;
-            end else
-                Cnt[3:0] <= Cnt[3:0] + 1'b1;
-        end else begin // 减 1
-            if (Cnt == 8'h00)
-                Cnt <= 8'h23;
-            else if (Cnt[3:0] == 4'd0) begin
-                Cnt[3:0] <= 4'd9;
-                Cnt[7:4] <= Cnt[7:4] - 1'b1;
-            end else
-                Cnt[3:0] <= Cnt[3:0] - 1'b1;
-        end
-
-    end else if (mode==0) begin // 正常模式
-        if (danwei == 0) begin // 24 小时制
-            if (Cnt == 8'h23)
-                Cnt <= 8'h00;
-            else if (Cnt[3:0] == 4'd9) begin
-                Cnt[3:0] <= 4'd0;
-                Cnt[7:4] <= Cnt[7:4] + 1'b1;
-            end else
-                Cnt[3:0] <= Cnt[3:0] + 1'b1;
-        end else begin // 12 小时制
-            if (Cnt == 8'h11) begin
-                Cnt <= 8'h00;
-                am_pm <= ~am_pm; // 翻转 AM/PM
-            end else if (Cnt == 8'h12) begin
-                Cnt <= 8'h01;
-            end else begin
-                if (Cnt[3:0] == 4'd9) begin
+        // 调整模式
+        else if (mode == 1) begin
+            if (dec) begin // 加 1
+                if (Cnt == 8'h23)
+                    Cnt <= 8'h00;
+                else if (Cnt[3:0] == 4'd9) begin
                     Cnt[3:0] <= 4'd0;
                     Cnt[7:4] <= Cnt[7:4] + 1'b1;
                 end else
                     Cnt[3:0] <= Cnt[3:0] + 1'b1;
+            end else begin // 减 1
+                if (Cnt == 8'h00)
+                    Cnt <= 8'h23;
+                else if (Cnt[3:0] == 4'd0) begin
+                    Cnt[3:0] <= 4'd9;
+                    Cnt[7:4] <= Cnt[7:4] - 1'b1;
+                end else
+                    Cnt[3:0] <= Cnt[3:0] - 1'b1;
+            end
+        end 
+        
+        // 正常模式
+        else begin
+            if (Cnt == 8'h23)
+                Cnt <= 8'h00;
+            else if (Cnt[3:0] == 4'd9) begin
+                Cnt[3:0] <= 4'd0;
+                Cnt[7:4] <= Cnt[7:4] + 1'b1;
+            end else
+                Cnt[3:0] <= Cnt[3:0] + 1'b1;
+        end
+
+        // 24 -> 12 小时转换
+        if (danwei == 1) begin // 12 小时制
+            if (Cnt == 8'h00) begin
+                Cnt <= 8'h12; // 00:00 -> 12:00 AM
+                am_pm <= 0;
+            end 
+            else if (Cnt == 8'h12) begin
+                am_pm <= 1; // 12:00 -> PM
+            end 
+            else if (Cnt > 8'h12) begin
+                Cnt <= Cnt - 8'h12; // 13:00 - 23:59 -> 1:00 - 11:59 PM
+                am_pm <= 1; // PM
+            end else begin
+                am_pm <= 0; // AM
             end
         end
     end
-end
-
 endmodule
+
+
 
 //数60 分
 module counter60_min(
